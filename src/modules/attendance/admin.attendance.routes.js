@@ -1,12 +1,10 @@
-// backend/src/modules/attendance/admin.attendance.routes.js
-
 const router = require('express').Router();
 const { pool } = require('../../config/db');
 const { authMiddleware, adminMiddleware } = require('../../middlewares/auth');
 const { Parser } = require('@json2csv/plainjs');
 
 // Admin daily dashboard
-// GET /api/admin/dashboard/today
+// GET /api/admin/attendance/dashboard/today
 router.get('/dashboard/today', [authMiddleware, adminMiddleware], async (req, res) => {
   try {
     const today = new Date().toISOString().split('T')[0];
@@ -18,7 +16,8 @@ router.get('/dashboard/today', [authMiddleware, adminMiddleware], async (req, re
           u.role,
           CASE WHEN a.check_in_at IS NOT NULL THEN TRUE ELSE FALSE END AS checked_in,
           a.status,
-          a.check_in_at
+          a.check_in_at,
+          a.check_out_at  -- Added check_out_at to the selection
        FROM
           users u
        LEFT JOIN
@@ -57,7 +56,7 @@ router.get('/', [authMiddleware, adminMiddleware], async (req, res) => {
   const { from, to, employeeId } = req.query;
   try {
     let query = `
-      SELECT a.id, u.name, u.employee_id, u.role, a.check_in_at, a.status
+      SELECT a.id, u.name, u.employee_id, u.role, a.check_in_at, a.check_out_at, a.status
       FROM attendance a
       JOIN users u ON a.user_id = u.id
       WHERE a.check_in_at::date BETWEEN $1 AND $2
@@ -81,7 +80,7 @@ router.get('/export.csv', [authMiddleware, adminMiddleware], async (req, res) =>
   const { from, to, employeeId } = req.query;
   try {
     let query = `
-      SELECT a.id, u.name, u.employee_id, u.role, a.check_in_at, a.status
+      SELECT a.id, u.name, u.employee_id, u.role, a.check_in_at, a.check_out_at, a.status
       FROM attendance a
       JOIN users u ON a.user_id = u.id
       WHERE a.check_in_at::date BETWEEN $1 AND $2
