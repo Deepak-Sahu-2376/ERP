@@ -1,0 +1,708 @@
+## 1. Project Overview 📜
+
+This document outlines the architecture and API endpoints for the ERP Office Backend. The system is a **Node.js application** designed to serve as the backbone for an office management system. It provides a RESTful API to handle core functionalities such as user authentication, employee management, attendance tracking, leave requests, and task management.
+
+The application is built with a modular structure, separating concerns for maintainability and scalability. It uses a PostgreSQL database to persist data and employs JSON Web Tokens (JWT) for securing API endpoints.
+
+---
+
+## 2. Tech Stack & Setup Guide 🛠️
+
+### Tech Stack
+
+- **Backend Framework**: Node.js, Express.js
+    
+- **Database**: PostgreSQL  
+	
+	- for Database **Installation** [[2. Installation of PostgreSQL]]
+	- for Database **Setup** [[3. Database Setup]]
+      
+- **Authentication**: JSON Web Tokens (JWT)
+    
+- **Password Hashing**: Bcrypt
+    
+- **File Uploads**: Multer
+    
+- **Environment Variables**: `dotenv`
+    
+- **Database Driver**: `pg`
+    
+
+### Setup Guide
+
+Follow these steps to get the backend server running locally.
+
+**1. Prerequisites**
+
+- **Node.js**: Version 18 or higher is recommended.
+    
+- **PostgreSQL**: A running instance of PostgreSQL server.
+    
+
+**2. Install Dependencies** Navigate to the project's root directory and run:
+
+Bash
+
+```
+npm install
+```
+
+**3. Database Configuration**
+
+- Log in to your PostgreSQL instance and create the database.
+    
+    Bash
+    
+    ```
+    sudo -i -u postgres
+    psql
+    CREATE DATABASE attendance_db;
+    \q
+    ```
+    
+- Connect to your new database (`psql attendance_db`) and run the SQL scripts provided in the `Database Setup.md` file to create the `users`, `attendance`, `leaves`, and `tasks` tables.
+    
+
+**4. Environment Variables**
+
+- Create a file named `.env` in the project's root directory.
+    
+- Add the following configuration, replacing `SECURE` with your actual PostgreSQL user's password.
+    
+    Code snippet
+    
+    ```
+    DATABASE_URL="postgres://postgres:SECURE@localhost:5432/attendance_db"
+    JWT_SECRET="Very_Secure"
+    ```
+    
+
+**5. Start the Server** Run the following command to start the application:
+
+Bash
+
+```
+node server.js
+```
+
+The server will start on port `3000` by default.
+
+---
+
+## 3. API Endpoint Documentation 📚
+
+This section provides detailed information for every API endpoint. Protected routes require a JWT sent in the `Authorization` header as `Bearer <token>`.
+
+### Authentication (`/api/auth`)
+
+#### User Login
+
+- **Endpoint**: `POST /api/auth/login`
+    
+- **Description**: Authenticates a user with their `employeeId` and `password`, returning a JWT upon success.
+    
+- **Authentication**: Public.
+    
+- **How to use in Postman**:
+    
+    1. Set the method to **POST**.
+        
+    2. Enter the URL: `http://localhost:3000/api/auth/login`.
+        
+    3. Go to the **Body** tab, select **raw**, and choose **JSON**.
+        
+    4. Provide the credentials:
+        
+        JSON
+        
+        ```
+        {
+          "employeeId": "EMP101",
+          "password": "password123"
+        }
+        ```
+        
+- **Success Response (200 OK)**:
+    
+    JSON
+    
+    ```
+    {
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+      "role": "ADMIN"
+    }
+    ```
+    
+- **Error Response (401 Unauthorized)**:
+    
+    JSON
+    
+    ```
+    {
+      "error": "Invalid credentials."
+    }
+    ```
+    
+
+---
+
+### User Management (`/api`)
+
+These routes handle employee data. Admin routes provide full CRUD functionality, while employees have read-only access to their own profiles.
+
+#### Get My Profile
+
+- **Endpoint**: `GET /api/me`
+    
+- **Description**: Fetches the profile information for the currently authenticated user.
+    
+- **Authentication**: **Authenticated** (Any Role).
+    
+- **How to use in Postman**:
+    
+    1. Set the method to **GET**.
+        
+    2. Enter the URL: `http://localhost:3000/api/me`.
+        
+    3. Go to the **Headers** tab and add the `Authorization` header with your token.
+        
+- **Success Response (200 OK)**:
+    
+    JSON
+    
+    ```
+    {
+        "name": "John Doe",
+        "employee_id": "EMP101",
+        "role": "ADMIN",
+        "email": "john.doe@example.com",
+        "phone": "123-456-7890",
+        "department": "Engineering",
+        "salary": "90000.00",
+        "date_hired": "2023-01-15T00:00:00.000Z",
+        "address": "123 Tech Park"
+    }
+    ```
+    
+
+#### Get All Users
+
+- **Endpoint**: `GET /api/admin/users`
+    
+- **Description**: Retrieves a list of all users in the system.
+    
+- **Authentication**: **Admin Only**.
+    
+- **How to use in Postman**:
+    
+    1. Set the method to **GET**.
+        
+    2. Enter the URL: `http://localhost:3000/api/admin/users`.
+        
+    3. Add the `Authorization` header with an admin token.
+        
+- **Success Response (200 OK)**:
+    
+    JSON
+    
+    ```
+    [
+      {
+        "id": 1,
+        "employee_id": "EMP101",
+        "name": "John Doe",
+        "role": "ADMIN",
+        "email": "john.doe@example.com",
+        "phone": "123-456-7890",
+        // ... other fields
+      }
+    ]
+    ```
+    
+
+#### Add New User
+
+- **Endpoint**: `POST /api/admin/users`
+    
+- **Description**: Creates a new user record. The `role` must be 'EMPLOYEE', 'ADMIN', or 'HR'.
+    
+- **Authentication**: **Admin Only**.
+    
+- **How to use in Postman**:
+    
+    1. Set the method to **POST**.
+        
+    2. Enter the URL: `http://localhost:3000/api/admin/users`.
+        
+    3. Add the admin `Authorization` header.
+        
+    4. In the **Body** (raw, JSON), provide user details:
+        
+        JSON
+        
+        ```
+        {
+            "employeeId": "EMP102",
+            "name": "Jane Smith",
+            "role": "EMPLOYEE",
+            "password": "securepassword",
+            "email": "jane.smith@example.com",
+            "phone": "987-654-3210",
+            "department": "Marketing",
+            "salary": 65000,
+            "date_hired": "2024-02-20",
+            "address": "456 Market St"
+        }
+        ```
+        
+- **Success Response (201 Created)**: Returns the newly created user object.
+    
+- **Error Response (409 Conflict)**:
+    
+    JSON
+    
+    ```
+    {
+      "error": "Employee with this ID or email already exists."
+    }
+    ```
+    
+
+#### Update User
+
+- **Endpoint**: `PUT /api/admin/:id`
+    
+- **Description**: Updates a user's details. You can send only the fields you want to change.
+    
+- **Authentication**: **Admin Only**.
+    
+- **How to use in Postman**:
+    
+    1. Set the method to **PUT**.
+        
+    2. Enter the URL: `http://localhost:3000/api/admin/2` (where `2` is the user ID).
+        
+    3. Add the admin `Authorization` header.
+        
+    4. In the **Body** (raw, JSON), provide the fields to update:
+        
+        JSON
+        
+        ```
+        {
+            "department": "Sales",
+            "salary": 70000
+        }
+        ```
+        
+- **Success Response (200 OK)**: Returns the complete, updated user object.
+    
+
+#### Delete User
+
+- **Endpoint**: `DELETE /api/admin/:id`
+    
+- **Description**: Deletes a user and their associated attendance records from the system.
+    
+- **Authentication**: **Admin Only**.
+    
+- **How to use in Postman**:
+    
+    1. Set the method to **DELETE**.
+        
+    2. Enter the URL: `http://localhost:3000/api/admin/2`.
+        
+    3. Add the admin `Authorization` header.
+        
+- **Success Response (200 OK)**:
+    
+    JSON
+
+    ```
+    {
+      "message": "User deleted successfully."
+    }
+    ```
+    
+
+---
+
+### Attendance Management (`/api/attendance` & `/api/admin/attendance`)
+
+#### Employee Check-In
+
+- **Endpoint**: `POST /api/attendance/check-in`
+    
+- **Description**: Records the check-in time for the authenticated user. Can only be done once per day.
+    
+- **Authentication**: **Authenticated**.
+    
+- **How to use in Postman**:
+    
+    1. Set the method to **POST**.
+        
+    2. Enter the URL: `http://localhost:3000/api/attendance/check-in`.
+        
+    3. Add the user `Authorization` header.
+        
+- **Success Response (201 Created)**:
+    
+    JSON
+    
+    ```
+    {
+      "message": "Check-in recorded successfully."
+    }
+    ```
+    
+- **Error Response (409 Conflict)**:
+    
+    JSON
+    
+    ```
+    {
+      "error": "You have already checked in today."
+    }
+    ```
+    
+
+#### Employee Check-Out
+
+- **Endpoint**: `POST /api/attendance/check-out`
+    
+- **Description**: Records the check-out time for the authenticated user's attendance record for the current day.
+    
+- **Authentication**: **Authenticated**.
+    
+- **How to use in Postman**:
+    
+    1. Set the method to **POST**.
+        
+    2. Enter the URL: `http://localhost:3000/api/attendance/check-out`.
+        
+    3. Add the user `Authorization` header.
+        
+- **Success Response (200 OK)**:
+    
+    JSON
+    
+    ```
+    {
+        "message": "Check-out successful.",
+        "checkOutTime": "2025-09-18T18:30:00.123Z"
+    }
+    ```
+    
+- **Error Response (404 Not Found)**:
+    
+    JSON
+    
+    ```
+    {
+      "error": "Check-in record for today not found."
+    }
+    ```
+    
+
+#### Get My Attendance History
+
+- **Endpoint**: `GET /api/attendance/me`
+    
+- **Description**: Retrieves the attendance history for the authenticated user within a specified date range.
+    
+- **Authentication**: **Authenticated**.
+    
+- **How to use in Postman**:
+    
+    1. Set the method to **GET**.
+        
+    2. Enter the URL with query parameters: `http://localhost:3000/api/attendance/me?from=2025-09-01&to=2025-09-18`.
+        
+    3. Add the user `Authorization` header.
+        
+- **Success Response (200 OK)**: Returns an array of attendance records.
+    
+
+#### Admin: Get Today's Dashboard
+
+- **Endpoint**: `GET /api/admin/attendance/dashboard/today`
+    
+- **Description**: Fetches a summary of all active employees and their check-in status for the current day.
+    
+- **Authentication**: **Admin Only**.
+    
+- **How to use in Postman**:
+    
+    1. Set the method to **GET**.
+        
+    2. Enter the URL: `http://localhost:3000/api/admin/attendance/dashboard/today`.
+        
+    3. Add the admin `Authorization` header.
+        
+- **Success Response (200 OK)**: Returns an array of user statuses.
+    
+
+#### Admin: Approve Attendance
+
+- **Endpoint**: `POST /api/admin/attendance/:id/approve`
+    
+- **Description**: Marks an employee's attendance record as 'APPROVED'.
+    
+- **Authentication**: **Admin Only**.
+    
+- **How to use in Postman**:
+    
+    1. Set the method to **POST**.
+        
+    2. Enter the URL: `http://localhost:3000/api/admin/attendance/5/approve` (where `5` is the attendance record ID).
+        
+    3. Add the admin `Authorization` header.
+        
+- **Success Response (200 OK)**:
+    
+    JSON
+    
+    ```
+    {
+      "message": "Attendance approved successfully."
+    }
+    ```
+    
+
+---
+
+### Leave Management (`/api/leaves`)
+
+#### Apply for Leave
+
+- **Endpoint**: `POST /api/leaves/apply`
+    
+- **Description**: Submits a leave application for an employee. An optional supporting document can be uploaded.
+    
+- **Authentication**: **Authenticated**.
+    
+- **How to use in Postman**:
+    
+    1. Set the method to **POST**.
+        
+    2. Enter the URL: `http://localhost:3000/api/leaves/apply`.
+        
+    3. Add the user `Authorization` header.
+        
+    4. Go to the **Body** tab and select **form-data**.
+        
+    5. Add the following keys:
+        
+        - `startDate` (Text): `2025-10-20`
+            
+        - `endDate` (Text): `2025-10-22`
+            
+        - `reason` (Text): `Family event.`
+            
+        - `document` (File): Click "Select Files" and choose a document.
+            
+- **Success Response (201 Created)**:
+    
+    JSON
+    
+    ```
+    {
+      "message": "Leave application submitted successfully."
+    }
+    ```
+    
+
+#### Get My Leave History
+
+- **Endpoint**: `GET /api/leaves/me`
+    
+- **Description**: Retrieves all leave applications for the authenticated user.
+    
+- **Authentication**: **Authenticated**.
+    
+- **How to use in Postman**:
+    
+    1. Set the method to **GET**.
+        
+    2. Enter the URL: `http://localhost:3000/api/leaves/me`.
+        
+    3. Add the user `Authorization` header.
+        
+- **Success Response (200 OK)**: Returns an array of the user's leave applications.
+    
+
+#### Admin: View All Leave Applications
+
+- **Endpoint**: `GET /api/leaves/admin`
+    
+- **Description**: Retrieves all leave applications, with optional filtering by date range and `employeeId`.
+    
+- **Authentication**: **Admin Only**.
+    
+- **How to use in Postman**:
+    
+    1. Set the method to **GET**.
+        
+    2. URL: `http://localhost:3000/api/leaves/admin?from=2025-10-01&to=2025-10-31&employeeId=EMP102`.
+        
+    3. Add the admin `Authorization` header.
+        
+- **Success Response (200 OK)**: Returns a filtered array of leave applications.
+    
+
+#### Admin: Update Leave Status
+
+- **Endpoint**: `PUT /api/leaves/admin/:id/status`
+    
+- **Description**: Approves or rejects a specific leave application. The status must be either 'APPROVED' or 'REJECTED'.
+    
+- **Authentication**: **Admin Only**.
+    
+- **How to use in Postman**:
+    
+    1. Set the method to **PUT**.
+        
+    2. URL: `http://localhost:3000/api/leaves/admin/3/status` (where `3` is the leave ID).
+        
+    3. Add the admin `Authorization` header.
+        
+    4. In the **Body** (raw, JSON), provide the new status:
+        
+        JSON
+        
+        ```
+        {
+          "status": "APPROVED"
+        }
+        ```
+        
+- **Success Response (200 OK)**:
+    
+    JSON
+    
+    ```
+    {
+      "message": "Leave request approved successfully.",
+      "leave": {
+        "id": 3,
+        "user_id": 2,
+        "status": "APPROVED",
+        // ... other fields
+      }
+    }
+    ```
+    
+
+---
+
+### Task Management (`/api/tasks`)
+
+These routes allow authenticated users to manage their personal tasks.
+
+#### Get All My Tasks
+
+- **Endpoint**: `GET /api/tasks`
+    
+- **Description**: Retrieves all tasks assigned to the authenticated user.
+    
+- **Authentication**: **Authenticated**.
+    
+- **How to use in Postman**:
+    
+    1. Set the method to **GET**.
+        
+    2. URL: `http://localhost:3000/api/tasks`.
+        
+    3. Add the user `Authorization` header.
+        
+- **Success Response (200 OK)**: Returns an array of task objects.
+    
+
+#### Create a New Task
+
+- **Endpoint**: `POST /api/tasks`
+    
+- **Description**: Creates a new task for the authenticated user.
+    
+- **Authentication**: **Authenticated**.
+    
+- **How to use in Postman**:
+    
+    1. Set the method to **POST**.
+        
+    2. URL: `http://localhost:3000/api/tasks`.
+        
+    3. Add the user `Authorization` header.
+        
+    4. In the **Body** (raw, JSON), provide task details:
+        
+        JSON
+        
+        ```
+        {
+            "title": "Prepare quarterly report",
+            "description": "Compile sales data and create presentation slides.",
+            "dueDate": "2025-09-30",
+            "category": "Reporting",
+            "priority": "High"
+        }
+        ```
+        
+- **Success Response (201 Created)**: Returns the newly created task object.
+    
+
+#### Update Task Completion
+
+- **Endpoint**: `PUT /api/tasks/:id`
+    
+- **Description**: Toggles the completion status of a task. The user can only update their own tasks.
+    
+- **Authentication**: **Authenticated**.
+    
+- **How to use in Postman**:
+    
+    1. Set the method to **PUT**.
+        
+    2. URL: `http://localhost:3000/api/tasks/1` (where `1` is the task ID).
+        
+    3. Add the user `Authorization` header.
+        
+    4. In the **Body** (raw, JSON), set the completed status:
+        
+        JSON
+        
+        ```
+        {
+          "completed": true
+        }
+        ```
+        
+- **Success Response (200 OK)**: Returns the updated task object.
+    
+
+#### Delete a Task
+
+- **Endpoint**: `DELETE /api/tasks/:id`
+    
+- **Description**: Deletes a task. The user can only delete their own tasks.
+    
+- **Authentication**: **Authenticated**.
+    
+- **How to use in Postman**:
+    
+    1. Set the method to **DELETE**.
+        
+    2. URL: `http://localhost:3000/api/tasks/1`.
+        
+    3. Add the user `Authorization` header.
+        
+- **Success Response (200 OK)**:
+    
+    JSON
+    
+  ```
+    {
+      "message": "Task deleted successfully."
+    }
+    ```
+
